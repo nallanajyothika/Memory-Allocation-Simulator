@@ -1,142 +1,126 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-```
-<title>Memory Allocation Simulator</title>
-
-<link rel="stylesheet" href="style.css">
-```
-
+    <title>Memory Allocation Simulator</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-```
-<header class="header">
+<header>
     <h1>Memory Allocation Simulator</h1>
-    <p>Visualize and compare operating system memory allocation algorithms.</p>
+    <p>Operating Systems Project</p>
 </header>
 
-<main class="container">
+<main>
 
     <section class="card">
-        <h2>Simulation Settings</h2>
+        <h2>Memory Configuration</h2>
 
-        <label for="blocks">Memory Block Sizes (KB)</label>
-        <input
-            type="text"
-            id="blocks"
-            value="100, 500, 200, 300, 600"
-            placeholder="Example: 100, 500, 200"
-        >
+        <label>Memory Blocks (comma separated)</label>
+        <input id="memoryInput" value="100, 200, 300, 400">
 
-        <label for="processes">Process Sizes (KB)</label>
-        <input
-            type="text"
-            id="processes"
-            value="212, 417, 112, 426"
-            placeholder="Example: 100, 200, 300"
-        >
+        <label>Process Sizes (comma separated)</label>
+        <input id="processInput" value="90, 150, 250, 100">
 
-        <label for="algorithm">Select Allocation Algorithm</label>
+        <label>Allocation Algorithm</label>
         <select id="algorithm">
-            <option value="first">First Fit</option>
-            <option value="best">Best Fit</option>
-            <option value="worst">Worst Fit</option>
+            <option value="First Fit">First Fit</option>
+            <option value="Best Fit">Best Fit</option>
+            <option value="Worst Fit">Worst Fit</option>
+            <option value="Next Fit">Next Fit</option>
         </select>
 
-        <button id="runButton">Run Simulation</button>
+        <label>Allocation Alignment (KB)</label>
+        <input id="alignment" type="number" value="4" min="1">
 
-        <p id="message" role="status"></p>
+        <div class="buttons">
+            <button id="runBtn">Run Allocation</button>
+            <button id="compareBtn">Compare Algorithms</button>
+            <button id="resetBtn">Reset</button>
+        </div>
     </section>
 
-    <section class="metrics">
+    <section class="card">
+        <h2>Memory Statistics</h2>
 
-        <div class="metric-card">
-            <h3>Total Memory</h3>
-            <p id="totalMemory">0 KB</p>
+        <div class="dashboard">
+            <div class="metric">
+                <h3>Total Memory</h3>
+                <p id="totalMemory">0 KB</p>
+            </div>
+
+            <div class="metric">
+                <h3>Allocated Memory</h3>
+                <p id="allocatedMemory">0 KB</p>
+            </div>
+
+            <div class="metric">
+                <h3>Free Memory</h3>
+                <p id="freeMemory">0 KB</p>
+            </div>
+
+            <div class="metric">
+                <h3>Memory Utilization</h3>
+                <p id="utilization">0%</p>
+            </div>
+
+            <div class="metric">
+                <h3>Internal Fragmentation</h3>
+                <p id="internalFrag">0 KB</p>
+            </div>
+
+            <div class="metric">
+                <h3>External Fragmentation Indicator</h3>
+                <p id="externalFrag">0 KB</p>
+            </div>
         </div>
-
-        <div class="metric-card">
-            <h3>Allocated Memory</h3>
-            <p id="allocatedMemory">0 KB</p>
-        </div>
-
-        <div class="metric-card">
-            <h3>Free Memory</h3>
-            <p id="freeMemory">0 KB</p>
-        </div>
-
-        <div class="metric-card">
-            <h3>Utilization</h3>
-            <p id="utilization">0%</p>
-        </div>
-
     </section>
 
     <section class="card">
         <h2>Memory Map</h2>
-
-        <div id="memoryMap" class="memory-map">
-            Run the simulation to display memory blocks.
-        </div>
-
-        <div class="legend">
-            <span>🟢 Allocated</span>
-            <span>⚪ Free</span>
+        <div id="memoryMap">
+            Run allocation to view memory.
         </div>
     </section>
 
     <section class="card">
-        <h2>Process Allocation Results</h2>
+        <h2>Allocation Results</h2>
 
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Process</th>
-                        <th>Process Size</th>
-                        <th>Allocated Block</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
+        <table>
+            <thead>
+                <tr>
+                    <th>Process</th>
+                    <th>Requested</th>
+                    <th>Allocated</th>
+                    <th>Start Address</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
 
-                <tbody id="resultsTable">
-                    <tr>
-                        <td colspan="4">No simulation results yet.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+            <tbody id="resultsBody"></tbody>
+        </table>
     </section>
 
     <section class="card">
         <h2>Algorithm Comparison</h2>
 
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Algorithm</th>
-                        <th>Successful Allocations</th>
-                        <th>Failed Allocations</th>
-                        <th>Utilization</th>
-                    </tr>
-                </thead>
+        <table>
+            <thead>
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Successful</th>
+                    <th>Failed</th>
+                    <th>Free Memory</th>
+                    <th>Utilization</th>
+                </tr>
+            </thead>
 
-                <tbody id="comparisonTable">
-                    <tr>
-                        <td colspan="4">Run the comparison to see results.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <button id="compareButton">Compare All Algorithms</button>
+            <tbody id="comparisonBody"></tbody>
+        </table>
     </section>
 
 </main>
@@ -145,8 +129,7 @@
     <p>Memory Allocation Simulator | Operating Systems Project</p>
 </footer>
 
-<script src="script.js"></script>
-```
+<script type="module" src="script.js"></script>
 
 </body>
 </html>

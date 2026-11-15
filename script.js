@@ -1,290 +1,262 @@
-// Find HTML elements using their IDs.
-const blocksInput = document.getElementById("blocks");
-const processesInput = document.getElementById("processes");
+import { ALGORITHMS } from "./allocation.js";
+
+import {
+    createMemory,
+    allocateProcesses,
+    deallocateProcess
+} from "./memory.js";
+
+import { calculateFragmentation } from "./fragmentation.js";
+
+import { compareAlgorithms } from "./comparison.js";
+
+
+// Global memory state
+let currentState = null;
+
+
+// Get HTML elements
+const memoryInput = document.getElementById("memoryInput");
+const processInput = document.getElementById("processInput");
 const algorithmInput = document.getElementById("algorithm");
+const alignmentInput = document.getElementById("alignment");
 
-const runButton = document.getElementById("runButton");
-const compareButton = document.getElementById("compareButton");
-const messageBox = document.getElementById("message");
+const runBtn = document.getElementById("runBtn");
+const compareBtn = document.getElementById("compareBtn");
+const resetBtn = document.getElementById("resetBtn");
 
-// Show a status message and style it as success or error.
-function setMessage(text, type) {
-  messageBox.textContent = text;
-  messageBox.className = type;
-}
 
-// Convert comma-separated input into an array of positive numbers.
-function readNumbers(input) {
-  const text = input.trim();
+// Convert comma-separated input into numbers
+function getNumbers(input) {
 
-  if (text === "") {
-    throw new Error("Please enter the required memory sizes.");
-  }
+    const values = input.split(",").map(value => value.trim());
 
-  const parts = text.split(",");
-
-  const numbers = parts.map(part => {
-    const value = part.trim();
-
-    if (value === "" || !/^\d+$/.test(value)) {
-      throw new Error("Enter positive whole numbers separated by commas.");
+    if (
+        values.some(value => value === "" || !Number.isFinite(Number(value)))
+    ) {
+        throw new Error("Enter valid comma-separated numbers.");
     }
 
-    const number = Number(value);
+    const numbers = values.map(Number);
 
-    if (!Number.isSafeInteger(number) || number <= 0) {
-      throw new Error("Every size must be a positive whole number.");
+    if (numbers.some(number => number <= 0)) {
+        throw new Error("All values must be greater than zero.");
     }
 
-    return number;
-  });
-
-  return numbers;
+    return numbers;
 }
 
-// Run First Fit, Best Fit or Worst Fit.
-function allocateMemory(blockSizes, processSizes, algorithm) {
-  // Keep track of remaining space in each block.
-  const remaining = [...blockSizes];
 
-  // Store each process's result.
-  const results = [];
+// Display dashboard statistics
+function renderDashboard() {
 
-  processSizes.forEach((processSize, index) => {
-    let selectedBlock = -1;
+    const metrics = calculateFragmentation(currentState);
 
-    if (algorithm === "first") {
-      // Choose the first block that can fit the process.
-      for (let i = 0; i < remaining.length; i++) {
-        if (remaining[i] >= processSize) {
-          selectedBlock = i;
-          break;
-        }
-      }
-    } else if (algorithm === "best") {
-      // Choose the smallest block that can fit the process.
-      for (let i = 0; i < remaining.length; i++) {
-        if (
-          remaining[i] >= processSize &&
-          (selectedBlock === -1 || remaining[i] < remaining[selectedBlock])
-        ) {
-          selectedBlock = i;
-        }
-      }
-    } else if (algorithm === "worst") {
-      // Choose the largest block that can fit the process.
-      for (let i = 0; i < remaining.length; i++) {
-        if (
-          remaining[i] >= processSize &&
-          (selectedBlock === -1 || remaining[i] > remaining[selectedBlock])
-        ) {
-          selectedBlock = i;
-        }
-      }
-    }
+    document.getElementById("totalMemory").textContent =
+        metrics.totalMemory + " KB";
 
-    if (selectedBlock !== -1) {
-      // Reduce the remaining space in the selected block.
-      remaining[selectedBlock] -= processSize;
+    document.getElementById("allocatedMemory").textContent =
+        metrics.allocatedMemory + " KB";
 
-      results.push({
-        process: index + 1,
-        size: processSize,
-        block: selectedBlock + 1,
-        status: "Allocated"
-      });
-    } else {
-      results.push({
-        process: index + 1,
-        size: processSize,
-        block: null,
-        status: "Failed"
-      });
-    }
-  });
+    document.getElementById("freeMemory").textContent =
+        metrics.freeMemory + " KB";
 
-  return {
-    results,
-    remaining,
-    blockSizes: [...blockSizes]
-  };
+    document.getElementById("utilization").textContent =
+        metrics.utilization + "%";
+
+    document.getElementById("internalFrag").textContent =
+        metrics.internalFragmentation + " KB";
+
+    document.getElementById("externalFrag").textContent =
+        metrics.externalFragmentation + " KB";
 }
 
-// Calculate the metrics and prepare the display data.
-function calculateMetrics(simulation) {
-  const totalMemory = simulation.blockSizes.reduce(
-    (sum, size) => sum + size,
-    0
-  );
 
-  const freeMemory = simulation.remaining.reduce(
-    (sum, size) => sum + size,
-    0
-  );
+// Display memory map
+function renderMemoryMap() {
 
-  const allocatedMemory = totalMemory - freeMemory;
+    const map = document.getElementById("memoryMap");
 
-  const utilization =
-    totalMemory > 0 ? (allocatedMemory / totalMemory) * 100 : 0;
+    map.innerHTML = "";
 
-  const successful = simulation.results.filter(
-    result => result.status === "Allocated"
-  ).length;
+    currentState.segments.forEach(segment => {
 
-  const failed = simulation.results.length - successful;
+        const block = document.createElement("div");
 
-  return {
-    totalMemory,
-    allocatedMemory,
-    freeMemory,
-    utilization,
-    successful,
-    failed
-  };
+        block.className = segment.allocated
+            ? "segment allocated"
+            : "segment free";
+
+        block.style.flexGrow = segment.size;
+
+        block.innerHTML = `
+            <strong>
+                ${segment.allocated ? segment.processId : "FREE"}
+            </strong>
+            <br>
+            ${segment.size} KB
+            <br>
+            Address: ${segment.start}
+        `;
+
+        map.appendChild(block);
+    });
 }
 
-// Display metric cards.
-function displayMetrics(metrics) {
-  document.getElementById("totalMemory").textContent =
-    `${metrics.totalMemory} KB`;
 
-  document.getElementById("allocatedMemory").textContent =
-    `${metrics.allocatedMemory} KB`;
+// Display allocation results
+function renderResults() {
 
-  document.getElementById("freeMemory").textContent =
-    `${metrics.freeMemory} KB`;
+    const body = document.getElementById("resultsBody");
 
-  document.getElementById("utilization").textContent =
-    `${metrics.utilization.toFixed(2)}%`;
-}
+    body.innerHTML = "";
 
-// Display the process allocation table.
-function displayResults(results) {
-  const table = document.getElementById("resultsTable");
-  table.replaceChildren();
+    currentState.results.forEach(result => {
 
-  results.forEach(result => {
-    const row = document.createElement("tr");
+        const row = document.createElement("tr");
 
-    const values = [
-      `P${result.process}`,
-      `${result.size} KB`,
-      result.block === null ? "None" : `Block ${result.block}`,
-      result.status
-    ];
+        const action = result.status === "Allocated"
+            ? `<button data-free="${result.processId}">Deallocate</button>`
+            : "-";
 
-    values.forEach(value => {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      row.appendChild(cell);
+        row.innerHTML = `
+            <td>${result.processId}</td>
+            <td>${result.requestedSize} KB</td>
+            <td>${result.allocatedSize} KB</td>
+            <td>${result.startAddress}</td>
+            <td>${result.status}</td>
+            <td>${action}</td>
+        `;
+
+        body.appendChild(row);
     });
 
-    table.appendChild(row);
-  });
-}
+    body.querySelectorAll("[data-free]").forEach(button => {
 
-// Display the colored memory map.
-function displayMemoryMap(simulation) {
-  const map = document.getElementById("memoryMap");
-  map.replaceChildren();
+        button.addEventListener("click", () => {
 
-  simulation.blockSizes.forEach((size, index) => {
-    const remaining = simulation.remaining[index];
-    const allocated = size - remaining;
+            const processId = button.dataset.free;
 
-    const block = document.createElement("div");
-    block.className =
-      "memory-block " + (allocated > 0 ? "allocated" : "free");
+            deallocateProcess(currentState, processId);
 
-    const title = document.createElement("strong");
-    title.textContent = `Block ${index + 1}`;
-
-    const original = document.createElement("p");
-    original.textContent = `Total: ${size} KB`;
-
-    const used = document.createElement("p");
-    used.textContent = `Used: ${allocated} KB`;
-
-    const free = document.createElement("p");
-    free.textContent = `Free: ${remaining} KB`;
-
-    block.append(title, original, used, free);
-    map.appendChild(block);
-  });
-}
-
-// Read inputs and run the selected algorithm.
-function runSimulation() {
-  try {
-    const blockSizes = readNumbers(blocksInput.value);
-    const processSizes = readNumbers(processesInput.value);
-
-    const simulation = allocateMemory(
-      blockSizes,
-      processSizes,
-      algorithmInput.value
-    );
-
-    const metrics = calculateMetrics(simulation);
-
-    displayMetrics(metrics);
-    displayResults(simulation.results);
-    displayMemoryMap(simulation);
-
-    setMessage("Simulation completed successfully.", "success");
-  } catch (error) {
-    setMessage(error.message, "error");
-  }
-}
-
-// Compare all three algorithms using the same inputs.
-function compareAlgorithms() {
-  try {
-    const blockSizes = readNumbers(blocksInput.value);
-    const processSizes = readNumbers(processesInput.value);
-
-    const algorithms = [
-      { key: "first", name: "First Fit" },
-      { key: "best", name: "Best Fit" },
-      { key: "worst", name: "Worst Fit" }
-    ];
-
-    const table = document.getElementById("comparisonTable");
-    table.replaceChildren();
-
-    algorithms.forEach(algorithm => {
-      const simulation = allocateMemory(
-        blockSizes,
-        processSizes,
-        algorithm.key
-      );
-
-      const metrics = calculateMetrics(simulation);
-
-      const row = document.createElement("tr");
-
-      const values = [
-        algorithm.name,
-        metrics.successful,
-        metrics.failed,
-        `${metrics.utilization.toFixed(2)}%`
-      ];
-
-      values.forEach(value => {
-        const cell = document.createElement("td");
-        cell.textContent = value;
-        row.appendChild(cell);
-      });
-
-      table.appendChild(row);
+            renderAll();
+        });
     });
-
-    setMessage("All three algorithms compared successfully.", "success");
-  } catch (error) {
-    setMessage(error.message, "error");
-  }
 }
 
-// Connect buttons to their functions.
-runButton.addEventListener("click", runSimulation);
-compareButton.addEventListener("click", compareAlgorithms);
+
+// Render everything
+function renderAll() {
+
+    renderDashboard();
+    renderMemoryMap();
+    renderResults();
+}
+
+
+// Run allocation
+runBtn.addEventListener("click", () => {
+
+    try {
+
+        const memoryBlocks = getNumbers(memoryInput.value);
+        const processSizes = getNumbers(processInput.value);
+
+        const alignment = Number(alignmentInput.value);
+
+        if (!Number.isInteger(alignment) || alignment <= 0) {
+            throw new Error("Alignment must be a positive whole number.");
+        }
+
+        const algorithm = algorithmInput.value;
+
+        currentState = createMemory(memoryBlocks);
+
+        allocateProcesses(
+            currentState,
+            processSizes,
+            algorithm,
+            alignment
+        );
+
+        document.getElementById("comparisonBody").innerHTML = "";
+
+        renderAll();
+
+    } catch (error) {
+
+        alert(error.message);
+    }
+});
+
+
+// Compare algorithms
+compareBtn.addEventListener("click", () => {
+
+    try {
+
+        const memoryBlocks = getNumbers(memoryInput.value);
+        const processSizes = getNumbers(processInput.value);
+
+        const alignment = Number(alignmentInput.value);
+
+        if (!Number.isInteger(alignment) || alignment <= 0) {
+            throw new Error("Alignment must be a positive whole number.");
+        }
+
+        const results = compareAlgorithms(
+            memoryBlocks,
+            processSizes,
+            alignment
+        );
+
+        const body = document.getElementById("comparisonBody");
+
+        body.innerHTML = "";
+
+        results.forEach(result => {
+
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+                <td>${result.algorithm}</td>
+                <td>${result.successful}</td>
+                <td>${result.failed}</td>
+                <td>${result.freeMemory} KB</td>
+                <td>${result.utilization}%</td>
+            `;
+
+            body.appendChild(row);
+        });
+
+    } catch (error) {
+
+        alert(error.message);
+    }
+});
+
+
+// Reset everything
+resetBtn.addEventListener("click", () => {
+
+    memoryInput.value = "100, 200, 300, 400";
+    processInput.value = "90, 150, 250, 100";
+    algorithmInput.value = "First Fit";
+    alignmentInput.value = "4";
+
+    currentState = null;
+
+    document.getElementById("totalMemory").textContent = "0 KB";
+    document.getElementById("allocatedMemory").textContent = "0 KB";
+    document.getElementById("freeMemory").textContent = "0 KB";
+    document.getElementById("utilization").textContent = "0%";
+    document.getElementById("internalFrag").textContent = "0 KB";
+    document.getElementById("externalFrag").textContent = "0 KB";
+
+    document.getElementById("memoryMap").innerHTML =
+        "Run allocation to view memory.";
+
+    document.getElementById("resultsBody").innerHTML = "";
+
+    document.getElementById("comparisonBody").innerHTML = "";
+});
